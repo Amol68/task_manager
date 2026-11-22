@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"os"
-	"regexp"
 	"slices"
 	"strings"
 	"time"
+	"unicode"
 )
 
 type Task struct {
@@ -23,17 +23,25 @@ type TaskManager struct {
 	Tasks []Task
 }
 
-var IsAlphaNumeric = regexp.MustCompile(`^[a-z0-9]+$`).MatchString
-var ErrInvalidTask = errors.New("invalid task");
+func hasSpecial(s string) bool {
+	for _, r := range s {
+		if !unicode.IsLetter(r) && !unicode.IsDigit(r) && !unicode.IsSpace(r) && r != '-' {
+			return true
+		}
+	}
+	return false
+}
+
+var (
+	ErrInvalidTask   = errors.New("invalid task")
+	ErrTaskNotFound  = errors.New("task not found")
+	ErrCompletedTask = errors.New("task already completed")
+)
 
 func (m *TaskManager) AddTask(title string) (Task, error) {
 
-	if len(strings.TrimSpace(title)) == 0 {
-		return Task{}, ErrInvalidTask;
-	}
-
-	if !IsAlphaNumeric(strings.ToLower(title)){
-		 return Task{}, ErrInvalidTask;
+	if len(strings.TrimSpace(title)) == 0 || hasSpecial(strings.ToLower(title)) {
+		return Task{}, ErrInvalidTask
 	}
 
 	id := uuid.NewString()
@@ -74,16 +82,20 @@ func (m *TaskManager) ListTasks() {
 
 func (m *TaskManager) CompleteTask(id string) error {
 
+	if len(strings.TrimSpace(id)) == 0 || hasSpecial(id) {
+		return ErrInvalidTask
+	}
+
 	idx := slices.IndexFunc(m.Tasks, func(task Task) bool {
 		return task.ID == id
 	})
 
 	if idx == -1 {
-		return errors.New("Invalid task.Task not found!")
+		return ErrTaskNotFound
 	}
 
 	if m.Tasks[idx].IsCompleted {
-		return errors.New("task already completed")
+		return ErrCompletedTask
 	}
 
 	m.Tasks[idx].IsCompleted = true
